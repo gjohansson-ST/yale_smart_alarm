@@ -45,7 +45,8 @@ class YaleDoorlock(CoordinatorEntity, LockEntity):
         self.coordinator = coordinator
         self._name = key["name"]
         self._address = key["address"].replace(":", "")
-        self._state = self.check_lock(key["status1"], key["minigw_lock_status"])
+        self._state = STATE_UNAVAILABLE
+        self._key = key
         super().__init__(coordinator)
 
     @property
@@ -72,6 +73,9 @@ class YaleDoorlock(CoordinatorEntity, LockEntity):
     @property
     def state(self):
         """Return the state of the device."""
+        self._state = self.check_lock(
+            self._key["status1"], self._key["minigw_lock_status"]
+        )
         return self._state
 
     @property

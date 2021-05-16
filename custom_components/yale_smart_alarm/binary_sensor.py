@@ -36,7 +36,8 @@ class YaleDoorWindowSensor(CoordinatorEntity, BinarySensorEntity):
         """Initialize Yale door window sensor."""
         self._name = key["name"]
         self._address = key["address"].replace(":", "")
-        self._state = self.check_sensor(key["status1"])
+        self._state = STATE_UNAVAILABLE
+        self._key = key
         self.coordinator = coordinator
         super().__init__(coordinator)
 
@@ -69,6 +70,7 @@ class YaleDoorWindowSensor(CoordinatorEntity, BinarySensorEntity):
     @property
     def is_on(self) -> bool:
         """Return the state of the sensor."""
+        self._state = self.check_sensor(self._key["status1"])
         return self._state == "open"
 
     def check_sensor(self, status):

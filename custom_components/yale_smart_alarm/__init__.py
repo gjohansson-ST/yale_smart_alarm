@@ -49,9 +49,12 @@ async def async_unload_entry(hass, entry):
 
     Platforms = []
     Platforms.append("alarm_control_panel")
-    if hass.data[DOMAIN][entry.entry_id]["coordinator"].data["lock"] != []:
+    if hass.data[DOMAIN][entry.entry_id]["coordinator"].data["locks"] != []:
         Platforms.append("lock")
-    if hass.data[DOMAIN][entry.entry_id]["coordinator"].data["door_window"] != []:
+    if (
+        hass.data[DOMAIN][entry.entry_id]["coordinator"].data["door_windows"] != []
+        or hass.data[DOMAIN][entry.entry_id]["coordinator"].data["pirs"] != []
+    ):
         Platforms.append("binary_sensor")
 
     unload_ok = all(

@@ -35,7 +35,7 @@ class YaleDoorWindowSensor(CoordinatorEntity, BinarySensorEntity):
     def __init__(self, coordinator: YaleDataUpdateCoordinator, key: dict):
         """Initialize Yale door window sensor."""
         self._name = key["name"]
-        self._mac = key["mac"]
+        self._address = key["address"].replace(":", "")
         self._state = self.check_sensor(key["status1"])
         self.coordinator = coordinator
         super().__init__(coordinator)
@@ -48,7 +48,7 @@ class YaleDoorWindowSensor(CoordinatorEntity, BinarySensorEntity):
     @property
     def unique_id(self) -> str:
         """Return the unique ID for this entity."""
-        return f"{self._mac}_door_window"
+        return f"{self._address}_door_window"
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -57,7 +57,7 @@ class YaleDoorWindowSensor(CoordinatorEntity, BinarySensorEntity):
             "name": self._name,
             "manufacturer": "Yale",
             "model": "main",
-            "identifiers": {(DOMAIN, self._mac)},
+            "identifiers": {(DOMAIN, self._address)},
             "via_device": (DOMAIN, "yale_smart_living"),
         }
 

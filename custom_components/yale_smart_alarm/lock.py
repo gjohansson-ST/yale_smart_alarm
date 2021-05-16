@@ -44,7 +44,7 @@ class YaleDoorlock(CoordinatorEntity, LockEntity):
         self._state = STATE_UNAVAILABLE
         self.coordinator = coordinator
         self._name = key["name"]
-        self._mac = key["mac"]
+        self._address = key["address"].replace(":", "")
         self._state = self.check_lock(key["status1"], key["minigw_lock_status"])
         super().__init__(coordinator)
 
@@ -56,7 +56,7 @@ class YaleDoorlock(CoordinatorEntity, LockEntity):
     @property
     def unique_id(self) -> str:
         """Return the unique ID for this entity."""
-        return self._mac
+        return self._address
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -65,7 +65,7 @@ class YaleDoorlock(CoordinatorEntity, LockEntity):
             "name": self._name,
             "manufacturer": "Yale",
             "model": "main",
-            "identifiers": {(DOMAIN, self._mac)},
+            "identifiers": {(DOMAIN, self._address)},
             "via_device": (DOMAIN, "yale_smart_living"),
         }
 

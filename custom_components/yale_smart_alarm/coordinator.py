@@ -67,11 +67,11 @@ class YaleDataUpdateCoordinator(DataUpdateCoordinator):
 
         for door_window in cycle["data"]["device_status"]:
             if door_window["type"] == "device_type.door_contact":
-                door_windows.append(lock)
+                door_windows.append(door_window)
 
         for pir in cycle["data"]["device_status"]:
             if pir["type"] == "device_type.pir":
-                pirs.append(lock)
+                pirs.append(pir)
 
         return {
             "alarm": arm_status,

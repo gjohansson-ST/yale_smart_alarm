@@ -1,8 +1,6 @@
 """Support for Yale Lock."""
 from __future__ import annotations
 
-import asyncio
-
 from homeassistant.components.lock import LockEntity
 from homeassistant.const import (
     ATTR_CODE,
@@ -11,9 +9,9 @@ from homeassistant.const import (
     STATE_UNAVAILABLE,
     STATE_UNLOCKED,
 )
+from homeassistant.core import callback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from homeassistant.core import callback
 
 from .const import DOMAIN, LOGGER
 from .coordinator import YaleDataUpdateCoordinator
@@ -120,13 +118,13 @@ class YaleDoorlock(CoordinatorEntity, LockEntity):
 
         LOGGER.debug("Yale doorlock %s", state)
 
-        if lock_state == True:
+        if lock_state:
             if state == "lock":
                 self._state = STATE_LOCKED
             elif state == "unlock":
                 self._state = STATE_UNLOCKED
 
-        await self.coordinator._async_refresh()
+        await self.coordinator.async_refresh()
 
     @callback
     def _handle_coordinator_update(self) -> None:

@@ -3,9 +3,9 @@ from __future__ import annotations
 
 from homeassistant.components.binary_sensor import DEVICE_CLASS_DOOR, BinarySensorEntity
 from homeassistant.const import STATE_UNAVAILABLE
+from homeassistant.core import callback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from homeassistant.core import callback
 
 from .const import DOMAIN
 from .coordinator import YaleDataUpdateCoordinator

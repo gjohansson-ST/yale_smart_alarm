@@ -97,19 +97,16 @@ class YaleAlarmDevice(CoordinatorEntity, AlarmControlPanelEntity):
     async def _async_set_arm_state(self, state) -> None:
         """Send set arm state command."""
         if state == "arm":
-            await self.hass.async_add_executor_job(self.coordinator._yale.arm_full())  # type: ignore[attr-defined]
+            await self.hass.async_add_executor_job(self.coordinator._yale.arm_full)  # type: ignore[attr-defined]
+            self._state = STATE_ALARM_ARMED_AWAY
         elif state == "home":
-            await self.hass.async_add_executor_job(self.coordinator._yale.arm_partial())  # type: ignore[attr-defined]
+            await self.hass.async_add_executor_job(self.coordinator._yale.arm_partial)  # type: ignore[attr-defined]
+            self._state = STATE_ALARM_ARMED_HOME
         elif state == "disarm":
-            await self.hass.async_add_executor_job(self.coordinator._yale.disarm())  # type: ignore[attr-defined]
+            await self.hass.async_add_executor_job(self.coordinator._yale.disarm)  # type: ignore[attr-defined]
+            self._state = STATE_ALARM_DISARMED
 
         LOGGER.debug("Yale set arm state %s", state)
-        transaction = None
-        while state != transaction:
-            await asyncio.sleep(0.5)
-            transaction = await self.hass.async_add_executor_job(
-                self.coordinator._yale.get_armed_status()  # type: ignore[attr-defined]
-            )
 
         await self.coordinator.async_refresh()
 

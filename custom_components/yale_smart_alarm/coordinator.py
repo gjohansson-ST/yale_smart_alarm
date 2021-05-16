@@ -6,14 +6,15 @@ from datetime import timedelta
 from yalesmartalarmclient.client import AuthenticationError, YaleSmartAlarmClient
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.const import (
+    CONF_PASSWORD,
+    CONF_USERNAME,
     STATE_LOCKED,
     STATE_UNAVAILABLE,
     STATE_UNLOCKED,
 )
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .const import DEFAULT_SCAN_INTERVAL, DOMAIN, LOGGER
 

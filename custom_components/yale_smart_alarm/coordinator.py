@@ -9,6 +9,11 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from homeassistant.const import (
+    STATE_LOCKED,
+    STATE_UNAVAILABLE,
+    STATE_UNLOCKED,
+)
 
 from .const import DEFAULT_SCAN_INTERVAL, DOMAIN, LOGGER
 
@@ -59,25 +64,54 @@ class YaleDataUpdateCoordinator(DataUpdateCoordinator):
 
         locks = []
         door_windows = []
-        pirs = []
 
         for lock in cycle["data"]["device_status"]:
             if lock["type"] == "device_type.door_lock":
+                state = lock["status1"]
+                lock_status_str = lock["minigw_lock_status"]
+                if lock_status_str != "":
+                    lock_status = int(lock_status_str, 16)
+                    closed = (lock_status & 16) == 16
+                    locked = (lock_status & 1) == 1
+                    if closed is True and locked is True:
+                        state = STATE_LOCKED
+                    elif closed is True and locked is False:
+                        state = STATE_UNLOCKED
+                    elif not closed:
+                        state = STATE_UNLOCKED
+                elif "device_status.lock" in state:
+                    state = STATE_LOCKED
+                elif "device_status.unlock" in state:
+                    state = STATE_UNLOCKED
+                else:
+                    state = STATE_UNAVAILABLE
+                lock["_state"] = state
                 locks.append(lock)
 
         for door_window in cycle["data"]["device_status"]:
             if door_window["type"] == "device_type.door_contact":
+                state = door_window["status1"]
+                if "device_status.dc_close" in state:
+                    state = "closed"
+                elif "device_status.dc_open" in state:
+                    state = "open"
+                else:
+                    state = STATE_UNAVAILABLE
+                door_window["_state"] = state
                 door_windows.append(door_window)
 
-        for pir in cycle["data"]["device_status"]:
-            if pir["type"] == "device_type.pir":
-                pirs.append(pir)
-
+        debug = {
+            "alarm": arm_status,
+            "locks": locks,
+            "door_windows": door_windows,
+            "status": status,
+            "online": online,
+        }
+        LOGGER.debug(f"{debug}")
         return {
             "alarm": arm_status,
             "locks": locks,
             "door_windows": door_windows,
-            "pirs": pirs,
             "status": status,
             "online": online,
         }

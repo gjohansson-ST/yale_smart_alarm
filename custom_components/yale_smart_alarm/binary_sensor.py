@@ -5,6 +5,7 @@ from homeassistant.components.binary_sensor import DEVICE_CLASS_DOOR, BinarySens
 from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.core import callback
 
 from .const import DOMAIN
 from .coordinator import YaleDataUpdateCoordinator
@@ -70,16 +71,17 @@ class YaleDoorWindowSensor(CoordinatorEntity, BinarySensorEntity):
     @property
     def is_on(self) -> bool:
         """Return the state of the sensor."""
-        self._state = self.check_sensor(self._key["status1"])
         return self._state == "open"
 
-    def check_sensor(self, status):
-        """Get state for sensors."""
-        state = status
-        if "device_status.dc_close" in state:
-            state = "closed"
-        elif "device_status.dc_open" in state:
-            state = "open"
-        else:
-            state = STATE_UNAVAILABLE
-        return state
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        for door_window in self.coordinator.data["door_windows"]:
+            if door_window["address"].replace(":", "") == self._address:
+                self._state = door_window["_state"]
+        super()._handle_coordinator_update()
+
+    async def async_added_to_hass(self) -> None:
+        """When entity is added to hass."""
+        await super().async_added_to_hass()
+        self._handle_coordinator_update()

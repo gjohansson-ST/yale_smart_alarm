@@ -13,6 +13,7 @@ from homeassistant.const import (
 )
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.core import callback
 
 from .const import DOMAIN, LOGGER
 from .coordinator import YaleDataUpdateCoordinator
@@ -73,9 +74,6 @@ class YaleDoorlock(CoordinatorEntity, LockEntity):
     @property
     def state(self):
         """Return the state of the device."""
-        self._state = self.check_lock(
-            self._key["status1"], self._key["minigw_lock_status"]
-        )
         return self._state
 
     @property
@@ -113,48 +111,32 @@ class YaleDoorlock(CoordinatorEntity, LockEntity):
                 self.coordinator._yale.lock_api.close_lock,  # type: ignore[attr-defined]
                 get_lock,
             )
-            expected = 1
         elif state == "unlock":
             lock_state = await self.hass.async_add_executor_job(
                 self.coordinator._yale.lock_api.open_lock,  # type: ignore[attr-defined]
                 get_lock,
                 code,
             )
-            expected = 2
 
         LOGGER.debug("Yale doorlock %s", state)
-        transaction = None
-        attempts = 0
-        while lock_state is not True and transaction != expected:
-            transaction = await self.hass.async_add_executor_job(
-                self.coordinator._yale.lock_api.get(self._name).state._value_  # type: ignore[attr-defined]
-            )
-            attempts += 1
-            if attempts == 30:
-                break
-            if attempts > 1:
-                await asyncio.sleep(0.5)
-        if state == transaction:
-            self._state = state
 
-    def check_lock(self, status1, status2):
-        """Get state for locks."""
-        state = status1
-        lock_status_str = status2
-        if lock_status_str != "":
-            lock_status = int(lock_status_str, 16)
-            closed = (lock_status & 16) == 16
-            locked = (lock_status & 1) == 1
-            if closed is True and locked is True:
-                state = STATE_LOCKED
-            elif closed is True and locked is False:
-                state = STATE_UNLOCKED
-            elif not closed:
-                state = STATE_UNLOCKED
-        elif "device_status.lock" in state:
-            state = STATE_LOCKED
-        elif "device_status.unlock" in state:
-            state = STATE_UNLOCKED
-        else:
-            state = STATE_UNAVAILABLE
-        return state
+        if lock_state == True:
+            if state == "lock":
+                self._state = STATE_LOCKED
+            elif state == "unlock":
+                self._state = STATE_UNLOCKED
+
+        await self.coordinator._async_refresh()
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        for lock in self.coordinator.data["locks"]:
+            if lock["address"].replace(":", "") == self._address:
+                self._state = lock["_state"]
+        super()._handle_coordinator_update()
+
+    async def async_added_to_hass(self) -> None:
+        """When entity is added to hass."""
+        await super().async_added_to_hass()
+        self._handle_coordinator_update()

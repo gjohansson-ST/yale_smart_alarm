@@ -7,6 +7,6 @@ DEFAULT_AREA_ID = "1"
 
 DOMAIN = "yale_smart_alarm"
 
-DEFAULT_SCAN_INTERVAL = 30
+DEFAULT_SCAN_INTERVAL = 15
 
 LOGGER = logging.getLogger(__package__)

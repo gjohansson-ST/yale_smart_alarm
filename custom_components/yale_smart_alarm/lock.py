@@ -59,7 +59,7 @@ class YaleDoorlock(CoordinatorEntity, LockEntity):
         return self._address
 
     @property
-    def device_info(self) -> DeviceInfo:
+    def device_info(self) -> Mapping[str, Any] | None:
         """Return device information about this entity."""
         return {
             "name": self._name,

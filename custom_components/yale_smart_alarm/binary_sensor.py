@@ -53,7 +53,7 @@ class YaleDoorWindowSensor(CoordinatorEntity, BinarySensorEntity):
         return f"{self._address}_door_window"
 
     @property
-    def device_info(self) -> DeviceInfo:
+    def device_info(self) -> Mapping[str, Any] | None:
         """Return device information about this entity."""
         return {
             "name": self._name,

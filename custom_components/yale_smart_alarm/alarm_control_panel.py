@@ -70,7 +70,7 @@ class YaleAlarmDevice(CoordinatorEntity, AlarmControlPanelEntity):
         return "yale_smart_alarm"
 
     @property
-    def device_info(self) -> DeviceInfo:
+    def device_info(self) -> Mapping[str, Any] | None:
         """Return device information about this entity."""
         return {
             "name": "Yale Smart Living",

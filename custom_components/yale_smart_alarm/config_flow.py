@@ -52,7 +52,7 @@ class YaleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             username = user_input[CONF_USERNAME]
             password = user_input[CONF_PASSWORD]
-            code = user_input[CONF_CODE]
+            code = user_input.get(CONF_CODE, "")
             name = user_input.get(CONF_NAME, DEFAULT_NAME)
             area = user_input.get(CONF_AREA_ID, DEFAULT_AREA_ID)
 

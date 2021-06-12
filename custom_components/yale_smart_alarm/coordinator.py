@@ -66,7 +66,7 @@ class YaleDataUpdateCoordinator(DataUpdateCoordinator):
         locks = []
         door_windows = []
 
-        for lock in cycle["data"]["device_status"]:
+        for lock in cycle["device_status"]:
             if lock["type"] == "device_type.door_lock":
                 state = lock["status1"]
                 lock_status_str = lock["minigw_lock_status"]
@@ -89,7 +89,7 @@ class YaleDataUpdateCoordinator(DataUpdateCoordinator):
                 lock["_state"] = state
                 locks.append(lock)
 
-        for door_window in cycle["data"]["device_status"]:
+        for door_window in cycle["device_status"]:
             if door_window["type"] == "device_type.door_contact":
                 state = door_window["status1"]
                 if "device_status.dc_close" in state:

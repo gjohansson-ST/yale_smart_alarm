@@ -1,0 +1,6 @@
+{
+  "name": "Yale Smart Alarm",
+  "domains": ["alarm_control_panel", "binary_sensor", "lock"],
+  "iot_class": ["Cloud Polling"],
+  "render_readme": true
+}

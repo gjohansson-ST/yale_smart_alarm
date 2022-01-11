@@ -1,7 +1,10 @@
 """Binary sensors for Yale Alarm."""
 from __future__ import annotations
 
-from homeassistant.components.binary_sensor import BinarySensorEntity
+from homeassistant.components.binary_sensor import (
+    BinarySensorDeviceClass,
+    BinarySensorEntity,
+)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_USERNAME
 from homeassistant.core import HomeAssistant
@@ -48,12 +51,14 @@ class YaleBinarySensor(CoordinatorEntity, BinarySensorEntity):
             identifiers={(DOMAIN, data["address"])},
             via_device=(DOMAIN, self._coordinator.entry.data[CONF_USERNAME]),
         )
+        self._attr_device_class = BinarySensorDeviceClass.DOOR
 
     @property
     def is_on(self) -> bool | None:
         """Return true if the binary sensor is on."""
-        for lock in self.coordinator.data["door_windows"]:
+        for contact in self.coordinator.data["door_windows"]:
             return bool(
-                lock["address"] == self._attr_unique_id and lock["_state"] == "open"
+                contact["address"] == self._attr_unique_id
+                and contact["_state"] == "open"
             )
         return None

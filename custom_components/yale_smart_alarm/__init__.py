@@ -1,70 +1,47 @@
 """The yale_smart_alarm component."""
 from __future__ import annotations
 
-import asyncio
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed
 
-from homeassistant.exceptions import ConfigEntryNotReady
-
-from .const import DOMAIN, LOGGER
+from .const import COORDINATOR, DOMAIN, LOGGER, PLATFORMS
 from .coordinator import YaleDataUpdateCoordinator
 
 
-async def async_setup(hass, config):
-    """No setup from yaml for Yale."""
-    return True
-
-
-async def async_setup_entry(hass, entry):
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Yale from a config entry."""
     hass.data.setdefault(DOMAIN, {})
     title = entry.title
 
     coordinator = YaleDataUpdateCoordinator(hass, entry=entry)
 
-    await coordinator.async_refresh()
-    if not coordinator.last_update_success:
-        raise ConfigEntryNotReady
+    if not await hass.async_add_executor_job(coordinator.get_updates):
+        raise ConfigEntryAuthFailed
+
+    await coordinator.async_config_entry_first_refresh()
 
     hass.data[DOMAIN][entry.entry_id] = {
-        "coordinator": coordinator,
+        COORDINATOR: coordinator,
     }
 
-    hass.async_create_task(
-        hass.config_entries.async_forward_entry_setup(entry, "alarm_control_panel")
-    )
-
-    hass.async_create_task(hass.config_entries.async_forward_entry_setup(entry, "lock"))
-
-    hass.async_create_task(
-        hass.config_entries.async_forward_entry_setup(entry, "binary_sensor")
-    )
+    hass.config_entries.async_setup_platforms(entry, PLATFORMS)
+    entry.async_on_unload(entry.add_update_listener(update_listener))
 
     LOGGER.debug("Loaded entry for %s", title)
 
     return True
 
 
-async def async_unload_entry(hass, entry):
+async def update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Handle options update."""
+    await hass.config_entries.async_reload(entry.entry_id)
+
+
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
 
-    Platforms = []
-    Platforms.append("alarm_control_panel")
-    if hass.data[DOMAIN][entry.entry_id]["coordinator"].data["locks"] != []:
-        Platforms.append("lock")
-    if (
-        hass.data[DOMAIN][entry.entry_id]["coordinator"].data["door_windows"] != []
-        or hass.data[DOMAIN][entry.entry_id]["coordinator"].data["pirs"] != []
-    ):
-        Platforms.append("binary_sensor")
-
-    unload_ok = all(
-        await asyncio.gather(
-            *[
-                hass.config_entries.async_forward_entry_unload(entry, component)
-                for component in Platforms
-            ]
-        )
-    )
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
     title = entry.title
     if unload_ok:

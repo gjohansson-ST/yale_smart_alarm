@@ -5,7 +5,7 @@ Custom Component for HA component development
 ## When installed it replaces the official component in HA. Take care!
 
 This is dev for the official component so please report issues as they are discovered with log extract.
-Currenttly using v 0.3.4 of yalesmartalarmclient package available on pypi
+Currenttly using v 0.3.7 of yalesmartalarmclient package available on pypi
 
 ### Installation
 

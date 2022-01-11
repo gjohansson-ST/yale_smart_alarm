@@ -1,139 +1,145 @@
-"""Support for Yale Lock."""
+"""Lock for Yale Alarm."""
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+from yalesmartalarmclient.exceptions import AuthenticationError, UnknownError
+
 from homeassistant.components.lock import LockEntity
-from homeassistant.const import (
-    ATTR_CODE,
-    CONF_CODE,
-    STATE_LOCKED,
-    STATE_UNAVAILABLE,
-    STATE_UNLOCKED,
-)
-from homeassistant.core import callback
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import ATTR_CODE, CONF_CODE, CONF_USERNAME
+from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, LOGGER
+from .const import (
+    CONF_LOCK_CODE_DIGITS,
+    COORDINATOR,
+    DEFAULT_LOCK_CODE_DIGITS,
+    DOMAIN,
+    LOGGER,
+    MANUFACTURER,
+    MODEL,
+)
 from .coordinator import YaleDataUpdateCoordinator
 
 
-async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
-    """Set up the lock platform."""
+async def async_setup_entry(
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
+) -> None:
+    """Set up the Yale lock entry."""
 
-    return True
-
-
-async def async_setup_entry(hass, entry, async_add_entities):
-    """Set up the lock entry."""
     coordinator: YaleDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id][
-        "coordinator"
+        COORDINATOR
     ]
-    async_add_entities(
-        YaleDoorlock(coordinator, key) for key in coordinator.data["locks"]
-    )
+    code_format = entry.options.get(CONF_LOCK_CODE_DIGITS, DEFAULT_LOCK_CODE_DIGITS)
 
-    return True
+    async_add_entities(
+        YaleDoorlock(coordinator, data, code_format)
+        for data in coordinator.data["locks"]
+    )
 
 
 class YaleDoorlock(CoordinatorEntity, LockEntity):
     """Representation of a Yale doorlock."""
 
-    def __init__(self, coordinator: YaleDataUpdateCoordinator, key: dict):
-        """Initialize the Yale Alarm Device."""
-        self._state = STATE_UNAVAILABLE
-        self.coordinator = coordinator
-        self._name = key["name"]
-        self._address = key["address"].replace(":", "")
-        self._state = STATE_UNAVAILABLE
-        self._key = key
+    def __init__(
+        self, coordinator: YaleDataUpdateCoordinator, data: dict, code_format: int
+    ) -> None:
+        """Initialize the Yale Lock Device."""
         super().__init__(coordinator)
-
-    @property
-    def name(self):
-        """Return the name of the device."""
-        return self._name
-
-    @property
-    def unique_id(self) -> str:
-        """Return the unique ID for this entity."""
-        return self._address
-
-    @property
-    def device_info(self) -> Mapping[str, Any] | None:
-        """Return device information about this entity."""
-        return {
-            "name": self._name,
-            "manufacturer": "Yale",
-            "model": "main",
-            "identifiers": {(DOMAIN, self._address)},
-            "via_device": (DOMAIN, "yale_smart_living"),
-        }
-
-    @property
-    def state(self):
-        """Return the state of the device."""
-        return self._state
-
-    @property
-    def is_locked(self):
-        """Return if locked."""
-        return self._state == STATE_LOCKED
-
-    @property
-    def code_format(self) -> str:
-        """Return the required six digit code."""
-        return "^\\d{6}$"
+        self._coordinator = coordinator
+        self._attr_name = data["name"]
+        self._attr_unique_id = data["address"]
+        self._attr_device_info = DeviceInfo(
+            name=self._attr_name,
+            manufacturer=MANUFACTURER,
+            model=MODEL,
+            identifiers={(DOMAIN, data["address"])},
+            via_device=(DOMAIN, self._coordinator.entry.data[CONF_USERNAME]),
+        )
+        self._attr_code_format = f"^\\d{code_format}$"
 
     async def async_unlock(self, **kwargs) -> None:
         """Send unlock command."""
-        code = kwargs.get(ATTR_CODE, self.coordinator._entry.data.get(CONF_CODE))  # type: ignore[attr-defined]
-        if code is None:
-            LOGGER.error("Code required but none provided")
-            return
+        if TYPE_CHECKING:
+            assert self._coordinator.yale, "Connection to API is missing"
 
-        await self.async_set_lock_state(code, "unlock")
+        code = kwargs.get(ATTR_CODE, self._coordinator.entry.options.get(CONF_CODE))
 
-    async def async_lock(self, **kwargs) -> None:
-        """Send lock command."""
-        code = ""
-        await self.async_set_lock_state(code, "lock")
-
-    async def async_set_lock_state(self, code: str, state: str) -> None:
-        """Send set lock state command."""
-        get_lock = await self.hass.async_add_executor_job(
-            self.coordinator._yale.lock_api.get, self._name  # type: ignore[attr-defined]
-        )
-        if state == "lock":
-
-            lock_state = await self.hass.async_add_executor_job(
-                self.coordinator._yale.lock_api.close_lock,  # type: ignore[attr-defined]
-                get_lock,
+        if not code:
+            raise HomeAssistantError(
+                f"No code provided, {self._attr_name} not unlocked"
             )
-        elif state == "unlock":
+
+        try:
+            get_lock = await self.hass.async_add_executor_job(
+                self._coordinator.yale.lock_api.get, self._attr_name
+            )
             lock_state = await self.hass.async_add_executor_job(
-                self.coordinator._yale.lock_api.open_lock,  # type: ignore[attr-defined]
+                self._coordinator.yale.lock_api.open_lock,
                 get_lock,
                 code,
             )
+        except (
+            AuthenticationError,
+            ConnectionError,
+            TimeoutError,
+            UnknownError,
+        ) as error:
+            raise HomeAssistantError(
+                f"Could not verify unlocking for {self._attr_name}: {error}"
+            ) from error
 
-        LOGGER.debug("Yale doorlock %s", state)
-
+        LOGGER.debug("Door unlock: %s", lock_state)
         if lock_state:
-            if state == "lock":
-                self._state = STATE_LOCKED
-            elif state == "unlock":
-                self._state = STATE_UNLOCKED
+            for lock in self.coordinator.data["locks"]:
+                if lock["address"] == self._attr_unique_id:
+                    lock["_state"] = "unlocked"
+                    LOGGER.debug("lock data %s", self.coordinator.data["locks"])
+            self.async_write_ha_state()
+            return
+        raise HomeAssistantError("Could not unlock, check system ready for unlocking")
 
-        await self.coordinator.async_refresh()
+    async def async_lock(self, **kwargs) -> None:
+        """Send lock command."""
+        if TYPE_CHECKING:
+            assert self._coordinator.yale, "Connection to API is missing"
 
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
+        try:
+            get_lock = await self.hass.async_add_executor_job(
+                self._coordinator.yale.lock_api.get, self._attr_name
+            )
+            lock_state = await self.hass.async_add_executor_job(
+                self._coordinator.yale.lock_api.close_lock,
+                get_lock,
+            )
+        except (
+            AuthenticationError,
+            ConnectionError,
+            TimeoutError,
+            UnknownError,
+        ) as error:
+            raise HomeAssistantError(
+                f"Could not verify unlocking for {self._attr_name}: {error}"
+            ) from error
+
+        LOGGER.debug("Door unlock: %s", lock_state)
+        if lock_state:
+            for lock in self.coordinator.data["locks"]:
+                if lock["address"] == self._attr_unique_id:
+                    lock["_state"] = "locked"
+            self.async_write_ha_state()
+            return
+        raise HomeAssistantError("Could not unlock, check system ready for unlocking")
+
+    @property
+    def is_locked(self) -> bool | None:
+        """Return true if the lock is locked."""
         for lock in self.coordinator.data["locks"]:
-            if lock["address"].replace(":", "") == self._address:
-                self._state = lock["_state"]
-        super()._handle_coordinator_update()
-
-    async def async_added_to_hass(self) -> None:
-        """When entity is added to hass."""
-        await super().async_added_to_hass()
-        self._handle_coordinator_update()
+            return bool(
+                lock["address"] == self._attr_unique_id and lock["_state"] == "locked"
+            )
+        return None

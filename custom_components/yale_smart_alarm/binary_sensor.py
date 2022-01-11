@@ -1,86 +1,59 @@
-"""Support for Yale binary sensors."""
+"""Binary sensors for Yale Alarm."""
 from __future__ import annotations
 
-from homeassistant.components.binary_sensor import DEVICE_CLASS_DOOR, BinarySensorEntity
-from homeassistant.const import STATE_UNAVAILABLE
-from homeassistant.core import callback
+from homeassistant.components.binary_sensor import BinarySensorEntity
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import CONF_USERNAME
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .const import (
+    COORDINATOR,
+    DOMAIN,
+    MANUFACTURER,
+    MODEL,
+)
 from .coordinator import YaleDataUpdateCoordinator
 
 
-async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
-    """Set up the binary_sensor platform."""
+async def async_setup_entry(
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
+) -> None:
+    """Set up the Yale binary sensor entry."""
 
-    return True
-
-
-async def async_setup_entry(hass, entry, async_add_entities):
-    """Set up the binary sensor entry."""
     coordinator: YaleDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id][
-        "coordinator"
+        COORDINATOR
     ]
+
     async_add_entities(
-        YaleDoorWindowSensor(coordinator, key)
-        for key in coordinator.data["door_windows"]
+        YaleBinarySensor(coordinator, data) for data in coordinator.data["door_windows"]
     )
 
-    return True
 
+class YaleBinarySensor(CoordinatorEntity, BinarySensorEntity):
+    """Representation of a Yale binary sensor."""
 
-class YaleDoorWindowSensor(CoordinatorEntity, BinarySensorEntity):
-    """Representation of a Yale door window sensor."""
-
-    def __init__(self, coordinator: YaleDataUpdateCoordinator, key: dict):
-        """Initialize Yale door window sensor."""
-        self._name = key["name"]
-        self._address = key["address"].replace(":", "")
-        self._state = STATE_UNAVAILABLE
-        self._key = key
-        self.coordinator = coordinator
+    def __init__(self, coordinator: YaleDataUpdateCoordinator, data: dict) -> None:
+        """Initialize the Yale Lock Device."""
         super().__init__(coordinator)
+        self._coordinator = coordinator
+        self._attr_name = data["name"]
+        self._attr_unique_id = data["address"]
+        self._attr_device_info = DeviceInfo(
+            name=self._attr_name,
+            manufacturer=MANUFACTURER,
+            model=MODEL,
+            identifiers={(DOMAIN, data["address"])},
+            via_device=(DOMAIN, self._coordinator.entry.data[CONF_USERNAME]),
+        )
 
     @property
-    def name(self):
-        """Return the name of the device."""
-        return self._name
-
-    @property
-    def unique_id(self) -> str:
-        """Return the unique ID for this entity."""
-        return f"{self._address}_door_window"
-
-    @property
-    def device_info(self) -> Mapping[str, Any] | None:
-        """Return device information about this entity."""
-        return {
-            "name": self._name,
-            "manufacturer": "Yale",
-            "model": "main",
-            "identifiers": {(DOMAIN, self._address)},
-            "via_device": (DOMAIN, "yale_smart_living"),
-        }
-
-    @property
-    def device_class(self) -> str:
-        """Return the class of this entity."""
-        return DEVICE_CLASS_DOOR
-
-    @property
-    def is_on(self) -> bool:
-        """Return the state of the sensor."""
-        return self._state == "open"
-
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
-        for door_window in self.coordinator.data["door_windows"]:
-            if door_window["address"].replace(":", "") == self._address:
-                self._state = door_window["_state"]
-        super()._handle_coordinator_update()
-
-    async def async_added_to_hass(self) -> None:
-        """When entity is added to hass."""
-        await super().async_added_to_hass()
-        self._handle_coordinator_update()
+    def is_on(self) -> bool | None:
+        """Return true if the binary sensor is on."""
+        for lock in self.coordinator.data["door_windows"]:
+            return bool(
+                lock["address"] == self._attr_unique_id and lock["_state"] == "open"
+            )
+        return None

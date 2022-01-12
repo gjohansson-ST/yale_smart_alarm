@@ -24,6 +24,7 @@ from .const import (
     MODEL,
 )
 from .coordinator import YaleDataUpdateCoordinator
+from .entity import YaleEntity
 
 
 async def async_setup_entry(
@@ -42,24 +43,14 @@ async def async_setup_entry(
     )
 
 
-class YaleDoorlock(CoordinatorEntity, LockEntity):
+class YaleDoorlock(YaleEntity, LockEntity):
     """Representation of a Yale doorlock."""
 
     def __init__(
         self, coordinator: YaleDataUpdateCoordinator, data: dict, code_format: int
     ) -> None:
         """Initialize the Yale Lock Device."""
-        super().__init__(coordinator)
-        self._coordinator = coordinator
-        self._attr_name = data["name"]
-        self._attr_unique_id = data["address"]
-        self._attr_device_info = DeviceInfo(
-            name=self._attr_name,
-            manufacturer=MANUFACTURER,
-            model=MODEL,
-            identifiers={(DOMAIN, data["address"])},
-            via_device=(DOMAIN, self._coordinator.entry.data[CONF_USERNAME]),
-        )
+        super().__init__(coordinator, data)
         self._attr_code_format = f"^\\d{code_format}$"
 
     async def async_unlock(self, **kwargs) -> None:

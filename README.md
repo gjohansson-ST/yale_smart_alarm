@@ -1,3 +1,7 @@
+# Archived
+
+This rep is now archived as all is included within HA 2022.2
+
 # yale_smart_alarm
 
 Custom Component for HA component development
